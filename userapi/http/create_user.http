@@ -1,0 +1,9 @@
+POST http://localhost:3333/api/v1/users
+Content-Type: application/json
+
+{
+  "display_name": "TEST1",
+  "email": "test"
+}
+
+###

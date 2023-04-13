@@ -1,0 +1,4 @@
+GET http://localhost:3333/api/v1/users/0
+Accept: application/json
+
+###
