@@ -39,11 +39,6 @@ func main() {
 	http.ListenAndServe(":3333", r)
 }
 
-// func NewClient()
-// func AddMiddleWare()
-// func InitHandlers(r router) add groups
-//
-
 func searchUsers(w http.ResponseWriter, r *http.Request) {
 	s := getUserStore()
 	render.JSON(w, r, s.List)
@@ -164,14 +159,6 @@ func ErrInvalidRequest(err error) render.Renderer {
 		ErrorText:      err.Error(),
 	}
 }
-
-//func validRequest(request *render.Binder, w http.ResponseWriter, r *http.Request) error {
-//	if err := render.Bind(r, *request); err != nil {
-//		_ = render.Render(w, r, ErrInvalidRequest(err))
-//		return err
-//	}
-//	return nil
-//}
 
 func existUser(userStore *UserStore, id string, w http.ResponseWriter, r *http.Request) bool {
 	if _, ok := userStore.List[id]; !ok {
