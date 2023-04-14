@@ -45,7 +45,7 @@ func main() {
 		w.Write([]byte(time.Now().String()))
 	})
 
-	r.Route("/api", func(r chi.Router) {
+	r.Route("/api", func(r chi.Router) { // todo fix it
 		r.Route("/v1", func(r chi.Router) {
 			r.Route("/users", func(r chi.Router) {
 				r.Get("/", searchUsers)
@@ -60,14 +60,16 @@ func main() {
 		})
 	})
 
-	http.ListenAndServe(":3333", r)
+	http.ListenAndServe(":3334", r)
 }
 
-func searchUsers(w http.ResponseWriter, r *http.Request) {
-	f, _ := os.ReadFile(store)
-	s := UserStore{}
-	_ = json.Unmarshal(f, &s)
+// func NewClient()
+// func AddMiddleWare()
+// func InitHandlers(r router) add groups
+//
 
+func searchUsers(w http.ResponseWriter, r *http.Request) {
+	s := getUserStore()
 	render.JSON(w, r, s.List)
 }
 
@@ -78,13 +80,10 @@ type CreateUserRequest struct {
 
 func (c *CreateUserRequest) Bind(r *http.Request) error { return nil }
 
-func createUser(w http.ResponseWriter, r *http.Request) {
-	f, _ := os.ReadFile(store)
-	s := UserStore{}
-	_ = json.Unmarshal(f, &s)
+func createUser(w http.ResponseWriter, r *http.Request) { // TODO ALMOST FIXED
+	s := getUserStore()
 
 	request := CreateUserRequest{}
-
 	if err := render.Bind(r, &request); err != nil {
 		_ = render.Render(w, r, ErrInvalidRequest(err))
 		return
@@ -94,15 +93,16 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 	u := User{
 		CreatedAt:   time.Now(),
 		DisplayName: request.DisplayName,
-		Email:       request.DisplayName,
+		Email:       request.Email,
 	}
-
 	id := strconv.Itoa(s.Increment)
 	s.List[id] = u
 
-	b, _ := json.Marshal(&s)
-	_ = os.WriteFile(store, b, fs.ModePerm)
-
+	err := toStore(&s)
+	if err != nil {
+		render.Status(r, http.StatusInternalServerError)
+		return
+	}
 	render.Status(r, http.StatusCreated)
 	render.JSON(w, r, map[string]interface{}{
 		"user_id": id,
@@ -110,12 +110,8 @@ func createUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func getUser(w http.ResponseWriter, r *http.Request) {
-	f, _ := os.ReadFile(store)
-	s := UserStore{}
-	_ = json.Unmarshal(f, &s)
-
+	s := getUserStore()
 	id := chi.URLParam(r, "id")
-
 	render.JSON(w, r, s.List[id])
 }
 
@@ -125,22 +121,18 @@ type UpdateUserRequest struct {
 
 func (c *UpdateUserRequest) Bind(r *http.Request) error { return nil }
 
-func updateUser(w http.ResponseWriter, r *http.Request) {
-	f, _ := os.ReadFile(store)
-	s := UserStore{}
-	_ = json.Unmarshal(f, &s)
+func updateUser(w http.ResponseWriter, r *http.Request) { // todo ALMOST FIXED
+	s := getUserStore()
 
 	request := UpdateUserRequest{}
-
 	if err := render.Bind(r, &request); err != nil {
 		_ = render.Render(w, r, ErrInvalidRequest(err))
 		return
 	}
 
 	id := chi.URLParam(r, "id")
-
-	if _, ok := s.List[id]; !ok {
-		_ = render.Render(w, r, ErrInvalidRequest(UserNotFound))
+	if !existUser(&s, id, w, r) {
+		render.Status(r, http.StatusNotFound)
 		return
 	}
 
@@ -148,29 +140,29 @@ func updateUser(w http.ResponseWriter, r *http.Request) {
 	u.DisplayName = request.DisplayName
 	s.List[id] = u
 
-	b, _ := json.Marshal(&s)
-	_ = os.WriteFile(store, b, fs.ModePerm)
-
+	err := toStore(&s)
+	if err != nil {
+		render.Status(r, http.StatusInternalServerError)
+		return
+	}
 	render.Status(r, http.StatusNoContent)
 }
 
-func deleteUser(w http.ResponseWriter, r *http.Request) {
-	f, _ := os.ReadFile(store)
-	s := UserStore{}
-	_ = json.Unmarshal(f, &s)
-
+func deleteUser(w http.ResponseWriter, r *http.Request) { // todo ALMOST FIXED
+	s := getUserStore()
 	id := chi.URLParam(r, "id")
 
-	if _, ok := s.List[id]; !ok {
-		_ = render.Render(w, r, ErrInvalidRequest(UserNotFound))
+	if !existUser(&s, id, w, r) {
+		render.Status(r, http.StatusNotFound)
 		return
 	}
-
 	delete(s.List, id)
 
-	b, _ := json.Marshal(&s)
-	_ = os.WriteFile(store, b, fs.ModePerm)
-
+	err := toStore(&s)
+	if err != nil {
+		render.Status(r, http.StatusInternalServerError)
+		return
+	}
 	render.Status(r, http.StatusNoContent)
 }
 
@@ -195,4 +187,36 @@ func ErrInvalidRequest(err error) render.Renderer {
 		StatusText:     "Invalid request.",
 		ErrorText:      err.Error(),
 	}
+}
+
+//func validRequest(request *render.Binder, w http.ResponseWriter, r *http.Request) error {
+//	if err := render.Bind(r, *request); err != nil {
+//		_ = render.Render(w, r, ErrInvalidRequest(err))
+//		return err
+//	}
+//	return nil
+//}
+
+func existUser(userStore *UserStore, id string, w http.ResponseWriter, r *http.Request) bool {
+	if _, ok := userStore.List[id]; !ok {
+		_ = render.Render(w, r, ErrInvalidRequest(UserNotFound))
+		return false
+	}
+	return true
+}
+
+func toStore(s *UserStore) error {
+	b, _ := json.Marshal(*s)
+	err := os.WriteFile(store, b, fs.ModePerm)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func getUserStore() UserStore {
+	f, _ := os.ReadFile(store)
+	s := UserStore{}
+	_ = json.Unmarshal(f, &s)
+	return s
 }
