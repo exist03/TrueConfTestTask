@@ -199,14 +199,16 @@ func timeNow(w http.ResponseWriter, r *http.Request) {
 func routerInit(r *chi.Mux) {
 	r.Get("/", timeNow)
 	r.Route("/api", func(r chi.Router) {
-		r.Route("/users", func(r chi.Router) {
-			r.Get("/", searchUsers)
-			r.Post("/", createUser)
+		r.Route("/v1", func(r chi.Router) {
+			r.Route("/users", func(r chi.Router) {
+				r.Get("/", searchUsers)
+				r.Post("/", createUser)
 
-			r.Route("/{id}", func(r chi.Router) {
-				r.Get("/", getUser)
-				r.Patch("/", updateUser)
-				r.Delete("/", deleteUser)
+				r.Route("/{id}", func(r chi.Router) {
+					r.Get("/", getUser)
+					r.Patch("/", updateUser)
+					r.Delete("/", deleteUser)
+				})
 			})
 		})
 	})
